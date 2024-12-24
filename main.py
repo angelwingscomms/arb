@@ -14,6 +14,7 @@ async def fetch_price(exchange, symbol) -> Optional[Tuple[str, int]]:
        return None
 
 async def compare_symbol(exchanges, symbol) -> Tuple[Tuple[str, int], Tuple[str, int]]:
+   print('comparing', symbol) 
    coroutines = [fetch_price(exchange, symbol) for exchange in exchanges]
    results = await gather(*coroutines);
    results = [result for result in results if result is not None]
@@ -56,24 +57,27 @@ def get_symbols():
         return json.load(f)
 
 def scan():
+    print('started')
     ex = {}
     prices = {}
     symbols = get_symbols()
-    symbols_to_scan = ['SOL', 'BTC', 'XRP', 'DOGE']
-    symbols = {k: v for k, v in symbols.items() if len(v) > 1 and any(sub in k for sub in symbols_to_scan)}
+    symbols_to_scan = ['SOL/USDT', 'BTC/USDT', 'XRP/USDT', 'DOGE/USDT']
+    symbols = {k: v for k, v in symbols.items() if len(v) > 1 and k in symbols_to_scan}
+    # symbols = {k: v for k, v in symbols.items() if len(v) > 1 and any(sub in k for sub in symbols_to_scan)}
     for symbol in symbols.keys():
         for exchange in symbols[symbol]:
-            x = getattr(ccxt, exchange)()
-            try:
-                print('loading', x.id)
-                x.load_markets()
-            except:
-                ''
-            if not x.id in ex:
-                ex[x.id] = x
+            if not exchange in ex:
+                x = getattr(ccxt, exchange)()
+                try:
+                    print('loading', x.id)
+                    x.load_markets()
+                    ex[x.id] = x
+                except:
+                    ''
 
     prices = []
     for symbol in symbols.keys():
+        print('starting', symbol)
         exchanges = [ex[x] for x in symbols[symbol]]
         prices.append(compare_symbol(exchanges, symbol))
     print(prices)
