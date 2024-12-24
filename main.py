@@ -7,17 +7,18 @@ from asyncio import gather, run
 async def fetch_price(exchange, symbol) -> Optional[Tuple[str, int]]:
    print('checking', symbol, 'on', exchange)
    try:
-       ticker = await exchange.fetch_ticker(symbol)
+       ticker = exchange.fetch_ticker(symbol)
        return exchange.id, ticker['last']
    except Exception as e:
        print(type(e).__name__, str(e))
        return None
 
 async def compare_symbol(exchanges, symbol) -> Tuple[Tuple[str, int], Tuple[str, int]]:
-   print('comparing', symbol) 
+   print('comparing', symbol)
    coroutines = [fetch_price(exchange, symbol) for exchange in exchanges]
    results = await gather(*coroutines);
-   results = [result for result in results if result is not None]
+   print('results', results)
+   results = [result for result in results if result is not None and result[1] is not None]
    if not results:
        raise ValueError('no valid results in compare_symbol')
    return min(results, key=lambda x: x[1]), max(results, key=lambda x: x[1])
@@ -56,7 +57,7 @@ def get_symbols():
     with open('symbols.json', 'r') as f:
         return json.load(f)
 
-def scan():
+async def scan():
     print('started')
     ex = {}
     prices = {}
@@ -72,13 +73,16 @@ def scan():
                     print('loading', x.id)
                     x.load_markets()
                     ex[x.id] = x
-                except:
-                    ''
+                    print('loaded', x.id)
+                except Exception as e:
+                    print('exception with', exchange, ':', e)
 
-    prices = []
+    # print(ex)
+    prices = {}
     for symbol in symbols.keys():
         print('starting', symbol)
-        exchanges = [ex[x] for x in symbols[symbol]]
-        prices.append(compare_symbol(exchanges, symbol))
+        exchanges = [ex[x] for x in symbols[symbol] if x in ex]
+        minmax = await compare_symbol(exchanges, symbol)
+        prices[symbol] = {"min": minmax[0], "max": minmax[1]}
     print(prices)
-scan()
+run(scan())
